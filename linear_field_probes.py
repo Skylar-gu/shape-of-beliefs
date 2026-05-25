@@ -207,7 +207,16 @@ def main():
     parser = argparse.ArgumentParser(description="Train linear probes on activation data.")
     parser.add_argument("--layer", type=int, default=DEFAULT_LAYER, help="Layer index to use.")
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Number of training epochs.")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.2-1B", help="HuggingFace model ID used to generate activations.")
+    parser.add_argument("--revision", type=str, default=None, help="HuggingFace revision used to generate activations.")
     args = parser.parse_args()
+
+    model_alias = args.model.split("/")[-1].lower()
+    revision_part = args.revision if args.revision else ""
+    activs_dir = BASE_DIR / "data" / "activations" / model_alias / revision_part
+
+    global ACTIVS_DIR
+    ACTIVS_DIR = activs_dir
 
     torch.manual_seed(SEED)
 
@@ -248,7 +257,7 @@ def main():
             explained = torch.zeros_like(eigvals_desc)
         cumulative_explained = torch.cumsum(explained, dim=0)
 
-    output_dir = BASE_DIR / output_dir_extension.format(epochs=args.epochs)
+    output_dir = BASE_DIR / "probes" / model_alias / revision_part / output_dir_extension.format(epochs=args.epochs)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"linear_probe_layer{args.layer}.pt"
     torch.save(

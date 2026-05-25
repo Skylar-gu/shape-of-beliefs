@@ -1,182 +1,140 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run the full activation pipeline across all OLMo-2-0425-1B training checkpoints.
+# Run the full activation pipeline across OLMo-2-0425-1B training checkpoints.
 # Run from repo root:
 #   chmod +x scripts/generate_all_checkpoints.sh
 #   ./scripts/generate_all_checkpoints.sh
 #
 # Outputs land in:
-#   data/activations/olmo-2-0425-1b-early-training/<revision>/<dataset>/
-#   data/activations/olmo-2-0425-1b/<revision>/<dataset>/       (stage2)
+#   data/activations/olmo-2-0425-1b/<revision>/<dataset>/
 #
-# To verify exact revision names before running:
+# Stage 1 checkpoints live on the main repo (allenai/OLMo-2-0425-1B) as branches.
+# Stage 1 fine-grained early training (1K-step resolution) lives on a separate repo:
+#   allenai/OLMo-2-0425-1B-early-training  (verify names before using)
+#
+# To re-verify all available revisions:
 #   python -c "
 #   from huggingface_hub import list_repo_refs
-#   refs = list_repo_refs('allenai/OLMo-2-0425-1B-early-training')
+#   refs = list_repo_refs('allenai/OLMo-2-0425-1B')
 #   for b in sorted(refs.branches, key=lambda x: x.name): print(b.name)
 #   "
 
+MODEL="allenai/OLMo-2-0425-1B"
 TOKEN_SUBSET="olmo-2-0425-1B_number_tokens.json"
 
 # ---------------------------------------------------------------------------
-# Stage 1 — early training checkpoints (every 1000 steps, 0–37000)
-# Hosted as branches on allenai/OLMo-2-0425-1B-early-training
+# Stage 1 — sampled checkpoints from the main repo
+# Full list goes step0 → step1907359 (4001B tokens), every 10K steps.
+# We sample: every 10K for the first 100K (early dynamics), then every 100K.
 # ---------------------------------------------------------------------------
-EARLY_MODEL="allenai/OLMo-2-0425-1B-early-training"
-
-EARLY_REVISIONS=(
+STAGE1_REVISIONS=(
   "stage1-step0-tokens0B"
-  "stage1-step1000-tokens2.1B"
-  "stage1-step2000-tokens4.2B"
-  "stage1-step3000-tokens6.3B"
-  "stage1-step4000-tokens8.4B"
-  "stage1-step5000-tokens10.5B"
-  "stage1-step6000-tokens12.6B"
-  "stage1-step7000-tokens14.7B"
-  "stage1-step8000-tokens16.8B"
-  "stage1-step9000-tokens18.9B"
+  "stage1-step300-tokens1B"
   "stage1-step10000-tokens21B"
-  "stage1-step11000-tokens23.1B"
-  "stage1-step12000-tokens25.2B"
-  "stage1-step13000-tokens27.3B"
-  "stage1-step14000-tokens29.4B"
-  "stage1-step15000-tokens31.5B"
-  "stage1-step16000-tokens33.6B"
-  "stage1-step17000-tokens35.7B"
-  "stage1-step18000-tokens37.8B"
-  "stage1-step19000-tokens39.9B"
   "stage1-step20000-tokens42B"
-  "stage1-step21000-tokens44.1B"
-  "stage1-step22000-tokens46.2B"
-  "stage1-step23000-tokens48.3B"
-  "stage1-step24000-tokens50.4B"
-  "stage1-step25000-tokens52.5B"
-  "stage1-step26000-tokens54.6B"
-  "stage1-step27000-tokens56.7B"
-  "stage1-step28000-tokens58.8B"
-  "stage1-step29000-tokens60.9B"
   "stage1-step30000-tokens63B"
-  "stage1-step31000-tokens65.1B"
-  "stage1-step32000-tokens67.2B"
-  "stage1-step33000-tokens69.3B"
-  "stage1-step34000-tokens71.4B"
-  "stage1-step35000-tokens73.5B"
-  "stage1-step36000-tokens75.6B"
-  "stage1-step37000-tokens77.7B"
+  "stage1-step40000-tokens84B"
+  "stage1-step50000-tokens105B"
+  "stage1-step60000-tokens126B"
+  "stage1-step70000-tokens147B"
+  "stage1-step80000-tokens168B"
+  "stage1-step90000-tokens189B"
+  "stage1-step100000-tokens210B"
+  "stage1-step200000-tokens420B"
+  "stage1-step300000-tokens630B"
+  "stage1-step400000-tokens839B"
+  "stage1-step500000-tokens1049B"
+  "stage1-step600000-tokens1259B"
+  "stage1-step700000-tokens1469B"
+  "stage1-step800000-tokens1678B"
+  "stage1-step900000-tokens1888B"
+  "stage1-step1000000-tokens2098B"
+  "stage1-step1907359-tokens4001B"
 )
 
 # ---------------------------------------------------------------------------
-# Stage 2 — ingredient 3 checkpoints (every 1000 steps, 1000–23852)
-# Hosted as branches on allenai/OLMo-2-0425-1B (main repo)
+# Stage 2 — ingredient 3 only (the one merged into the final model)
+# Ingredients 1 and 2 are exploratory runs; add them here if needed.
 # ---------------------------------------------------------------------------
-STAGE2_MODEL="allenai/OLMo-2-0425-1B"
-
 STAGE2_REVISIONS=(
-  "stage2-ingredient3-step1000"
-  "stage2-ingredient3-step2000"
-  "stage2-ingredient3-step3000"
-  "stage2-ingredient3-step4000"
-  "stage2-ingredient3-step5000"
-  "stage2-ingredient3-step6000"
-  "stage2-ingredient3-step7000"
-  "stage2-ingredient3-step8000"
-  "stage2-ingredient3-step9000"
-  "stage2-ingredient3-step10000"
-  "stage2-ingredient3-step11000"
-  "stage2-ingredient3-step12000"
-  "stage2-ingredient3-step13000"
-  "stage2-ingredient3-step14000"
-  "stage2-ingredient3-step15000"
-  "stage2-ingredient3-step16000"
-  "stage2-ingredient3-step17000"
-  "stage2-ingredient3-step18000"
-  "stage2-ingredient3-step19000"
-  "stage2-ingredient3-step20000"
-  "stage2-ingredient3-step21000"
-  "stage2-ingredient3-step22000"
-  "stage2-ingredient3-step23000"
-  "stage2-ingredient3-step23852"
+  "stage2-ingredient3-step1000-tokens3B"
+  "stage2-ingredient3-step2000-tokens5B"
+  "stage2-ingredient3-step3000-tokens7B"
+  "stage2-ingredient3-step4000-tokens9B"
+  "stage2-ingredient3-step5000-tokens11B"
+  "stage2-ingredient3-step6000-tokens13B"
+  "stage2-ingredient3-step7000-tokens15B"
+  "stage2-ingredient3-step8000-tokens17B"
+  "stage2-ingredient3-step9000-tokens19B"
+  "stage2-ingredient3-step10000-tokens21B"
+  "stage2-ingredient3-step11000-tokens24B"
+  "stage2-ingredient3-step12000-tokens26B"
+  "stage2-ingredient3-step13000-tokens28B"
+  "stage2-ingredient3-step14000-tokens30B"
+  "stage2-ingredient3-step15000-tokens32B"
+  "stage2-ingredient3-step16000-tokens34B"
+  "stage2-ingredient3-step17000-tokens36B"
+  "stage2-ingredient3-step18000-tokens38B"
+  "stage2-ingredient3-step19000-tokens40B"
+  "stage2-ingredient3-step20000-tokens42B"
+  "stage2-ingredient3-step21000-tokens45B"
+  "stage2-ingredient3-step22000-tokens47B"
+  "stage2-ingredient3-step23000-tokens49B"
+  "stage2-ingredient3-step23852-tokens51B"
 )
 
+# Two datasets: m300 and m700 (extremes). Combined is used for dynamics analysis.
+# To run a single dataset only, set DATASETS=("gaussian_m500_s100_l1000_n10") and remove COMBINED_DATASET.
 DATASETS=(
   "gaussian_m300_s100_l1000_n10"
-  "gaussian_m350_s100_l1000_n10"
-  "gaussian_m400_s100_l1000_n10"
-  "gaussian_m450_s100_l1000_n10"
-  "gaussian_m500_s010_l1000_n10"
-  "gaussian_m500_s020_l1000_n10"
-  "gaussian_m500_s030_l1000_n10"
-  "gaussian_m500_s050_l1000_n10"
-  "gaussian_m500_s080_l1000_n10"
-  "gaussian_m500_s100_l1000_n10"
-  "gaussian_m500_s120_l1000_n10"
-  "gaussian_m500_s150_l1000_n10"
-  "gaussian_m500_s200_l1000_n10"
-  "gaussian_m550_s100_l1000_n10"
-  "gaussian_m600_s100_l1000_n10"
-  "gaussian_m650_s100_l1000_n10"
   "gaussian_m700_s100_l1000_n10"
 )
 COMBINED_DATASET="gaussian_m300_s100_l1000_n10+gaussian_m700_s100_l1000_n10"
 
-# Sequences only need to be generated once (they don't depend on the model)
+# Sequences only need to be generated once (independent of model)
 echo "=== Generating sequences (once) ==="
 for ds in "${DATASETS[@]}"; do
   if [[ "$ds" =~ ^gaussian_m([0-9]+)_s([0-9]+)_l([0-9]+)_n([0-9]+)$ ]]; then
-    mean="${BASH_REMATCH[1]}"
-    std="${BASH_REMATCH[2]}"
-    len="${BASH_REMATCH[3]}"
-    num="${BASH_REMATCH[4]}"
-    uv run python generate_sequences.py --num-seq "$num" --len-seq "$len" --mean "$mean" --std "$std"
+    uv run python generate_sequences.py \
+      --num-seq "${BASH_REMATCH[4]}" \
+      --len-seq "${BASH_REMATCH[3]}" \
+      --mean   "${BASH_REMATCH[1]}" \
+      --std    "${BASH_REMATCH[2]}"
   fi
 done
 
 # ---------------------------------------------------------------------------
-# Stage 1 early training
-# ---------------------------------------------------------------------------
-echo ""
-echo "=== Stage 1: early training (${#EARLY_REVISIONS[@]} checkpoints) ==="
-
-for rev in "${EARLY_REVISIONS[@]}"; do
+run_checkpoint() {
+  local model="$1"
+  local rev="$2"
   echo ""
-  echo "--- $EARLY_MODEL @ $rev ---"
+  echo "--- $model @ $rev ---"
   for ds in "${DATASETS[@]}"; do
     uv run python sequences_to_activations.py \
       --dataset-name "$ds" \
-      --model "$EARLY_MODEL" \
+      --model        "$model" \
       --token-subset "$TOKEN_SUBSET" \
-      --revision "$rev"
+      --revision     "$rev"
   done
   uv run python sequences_to_activations.py \
     --dataset-name "$COMBINED_DATASET" \
-    --model "$EARLY_MODEL" \
+    --model        "$model" \
     --token-subset "$TOKEN_SUBSET" \
-    --revision "$rev"
+    --revision     "$rev"
+}
+
+echo ""
+echo "=== Stage 1 (${#STAGE1_REVISIONS[@]} checkpoints) ==="
+for rev in "${STAGE1_REVISIONS[@]}"; do
+  run_checkpoint "$MODEL" "$rev"
 done
 
-# ---------------------------------------------------------------------------
-# Stage 2 ingredient 3
-# ---------------------------------------------------------------------------
 echo ""
 echo "=== Stage 2 ingredient 3 (${#STAGE2_REVISIONS[@]} checkpoints) ==="
-
 for rev in "${STAGE2_REVISIONS[@]}"; do
-  echo ""
-  echo "--- $STAGE2_MODEL @ $rev ---"
-  for ds in "${DATASETS[@]}"; do
-    uv run python sequences_to_activations.py \
-      --dataset-name "$ds" \
-      --model "$STAGE2_MODEL" \
-      --token-subset "$TOKEN_SUBSET" \
-      --revision "$rev"
-  done
-  uv run python sequences_to_activations.py \
-    --dataset-name "$COMBINED_DATASET" \
-    --model "$STAGE2_MODEL" \
-    --token-subset "$TOKEN_SUBSET" \
-    --revision "$rev"
+  run_checkpoint "$MODEL" "$rev"
 done
 
 echo ""
-echo "=== Done. All checkpoints processed. ==="
+echo "=== Done. ==="
