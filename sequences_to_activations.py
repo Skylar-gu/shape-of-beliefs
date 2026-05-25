@@ -11,15 +11,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # DATASET_NAME = "gaussian_m500_s100_l1000_n10" # if several, combine with a +
 # can't do more than 10 sequences of l1000 on one GPU... make updates for that
 DEFAULT_DATASET_NAME = "gaussian_m500_s100_l1000_n10"
-
-MODEL_NAME = "meta-llama/Llama-3.2-1B"
+DEFAULT_MODEL_NAME = "meta-llama/Llama-3.2-1B"
+DEFAULT_TOKEN_SUBSET = "llama3-2-1B_number_tokens.json"
 
 BASE_DIR = Path(__file__).resolve().parent
 
 JSONL_DIR = Path(BASE_DIR) / "data" / "sequences"
 BATCH_SIZE = 10
-
-TOKEN_SUBSET_PATH = Path(BASE_DIR) / "token_subset" / "llama3-2-1B_number_tokens.json"
 
 ALLOW_OVERWRITE = False
 
@@ -132,20 +130,44 @@ def main():
         default=DEFAULT_DATASET_NAME,
         help="Dataset name or '+'-joined list of dataset names.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL_NAME,
+        help="HuggingFace model ID (default: meta-llama/Llama-3.2-1B).",
+    )
+    parser.add_argument(
+        "--token-subset",
+        type=str,
+        default=DEFAULT_TOKEN_SUBSET,
+        help="Filename of the token subset JSON in token_subset/ (default: llama3-2-1B_number_tokens.json).",
+    )
+    parser.add_argument(
+        "--revision",
+        type=str,
+        default=None,
+        help="HuggingFace revision (branch/tag) to load, e.g. stage1-step1000-tokens2.1B.",
+    )
     args = parser.parse_args()
+
+    MODEL_NAME = args.model
+    TOKEN_SUBSET_PATH = Path(BASE_DIR) / "token_subset" / args.token_subset
 
     dataset_names = [name.strip() for name in args.dataset_name.split("+") if name.strip()]
     combined_dataset_name = "+".join(dataset_names)
-    activs_output_dir = Path(BASE_DIR) / "data" / "activations" / combined_dataset_name
-    logits_output_dir = Path(BASE_DIR) / "data" / "logits" / combined_dataset_name
+    model_alias = MODEL_NAME.split("/")[-1].lower()
+    revision_part = args.revision if args.revision else ""
+    activs_output_dir = Path(BASE_DIR) / "data" / "activations" / model_alias / revision_part / combined_dataset_name
+    logits_output_dir = Path(BASE_DIR) / "data" / "logits" / model_alias / revision_part / combined_dataset_name
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, revision=args.revision)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
+        revision=args.revision,
         torch_dtype=torch.float32,
     )
     model.to(device)
