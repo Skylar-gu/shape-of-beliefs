@@ -5,11 +5,11 @@ the paper (arXiv:2602.02315) and labelled 'paper (approx.)' where only
 anchor points or approximate ranges are available.
 
 Outputs:
-  figures/comparison/compare_layer_accuracy.png
-  figures/comparison/compare_transfer_accuracy.png
-  figures/comparison/compare_per_dataset_accuracy.png
-  figures/comparison/compare_eigenvalues.png
-  figures/comparison/compare_all.png  (4-panel composite)
+  comparison/compare_layer_accuracy.png
+  comparison/compare_transfer_accuracy.png
+  comparison/compare_per_dataset_accuracy.png
+  comparison/compare_eigenvalues.png
+  comparison/compare_all.png  (4-panel composite)
 """
 from pathlib import Path
 import torch
@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-BASE_DIR   = Path(__file__).resolve().parent.parent.parent
+BASE_DIR   = Path(__file__).resolve().parent.parent
 PROBE_DIR  = BASE_DIR / "probes" / "olmo-2-0425-1b" / "probes" / "epoch100_biasFalse"
 OUT_DIR    = Path(__file__).resolve().parent
 OUT_DIR.mkdir(parents=True, exist_ok=True)
