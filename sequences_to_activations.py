@@ -168,7 +168,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         revision=args.revision,
-        torch_dtype=torch.float32,
+        torch_dtype=torch.bfloat16,
     )
     model.to(device)
     model.eval()
