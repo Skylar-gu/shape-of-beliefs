@@ -12,7 +12,5 @@ wheels/
 # data files
 *.pt
 *.html
-*.png
-*.pdf
 
 tmp/
